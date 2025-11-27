@@ -3,7 +3,7 @@ import { IsString, MinLength, Matches } from 'class-validator';
 export class LoginDto {
   @IsString({ message: 'Имя пользователя должно быть строкой' })
   @MinLength(1, { message: 'Имя пользователя не может быть пустым' })
-  @Matches(/^[a-zA-Z0-9]+$/, {
+  @Matches(/^[a-zA-Zа-яА-ЯёЁ0-9]+$/, {
     message: 'Имя пользователя должно содержать только буквы и цифры',
   })
   username!: string;

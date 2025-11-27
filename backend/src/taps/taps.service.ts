@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from "@prisma/client";
+import { UserRole, Round } from "@prisma/client";
 
 @Injectable()
 export class TapsService {
@@ -13,33 +13,46 @@ export class TapsService {
 
   constructor(private prisma: PrismaService) {}
 
+  private validateRound(round: Round | null, now: Date) {
+    if (!round) {
+      throw new NotFoundException('Раунд не найден');
+    }
+    // Проверяем активность раунда на основе серверного времени
+    if (now < round.startDate) {
+      throw new BadRequestException('Раунд еще не начался');
+    }
+    if (now >= round.endDate) {
+      throw new BadRequestException('Раунд уже завершен');
+    }
+  }
+
   async tap(roundId: string, userId: string, userRole: UserRole) {
     const now = new Date();
 
+    // Для Nikita просто проверяем активность раунда и возвращаем ответ без сохранения
+    if (userRole === UserRole.NIKITA) {
+      const round = await this.prisma.round.findUnique({
+        where: { id: roundId },
+      });
+      this.validateRound(round, now);
+
+      this.logger.log(`Tap (Nikita): userId=${userId}, roundId=${roundId} - not saved`);
+      return {
+        tapId: '',
+        score: 0,
+        myTotalScore: 0,
+        tapNumber: 0,
+      };
+    }
+
+    // Для обычных пользователей выполняем транзакцию с сохранением тапа
     return this.prisma.$transaction(
       async (tx) => {
         // Блокируем запись раунда для чтения с блокировкой
         const round = await tx.round.findUnique({
           where: { id: roundId },
-          select: {
-            id: true,
-            startDate: true,
-            endDate: true,
-            totalScore: true,
-          },
         });
-
-        if (!round) {
-          throw new NotFoundException('Раунд не найден');
-        }
-
-        // Проверяем активность раунда на основе серверного времени
-        if (now < round.startDate) {
-          throw new BadRequestException('Раунд еще не начался');
-        }
-        if (now >= round.endDate) {
-          throw new BadRequestException('Раунд уже завершен');
-        }
+        this.validateRound(round, now);
 
         // Получаем последний тап пользователя в этом раунде
         const lastTap = await tx.tap.findFirst({
@@ -48,11 +61,8 @@ export class TapsService {
         });
 
         const nextTapNumber = (lastTap?.tapNumber || 0) + 1;
-
         // Определяем очки: каждый 11-й тап дает 10 очков, остальные - 1
-        // Для Nikita всегда 0
-        const baseScore = nextTapNumber % 11 === 0 ? 10 : 1;
-        const score = userRole === UserRole.NIKITA ? 0 : baseScore;
+        const score = nextTapNumber % 11 === 0 ? 10 : 1;
 
         // Создаем тап
         const tap = await tx.tap.create({
@@ -65,13 +75,11 @@ export class TapsService {
           },
         });
 
-        // Обновляем общий счет раунда только если score > 0
-        if (score > 0) {
-          await tx.round.update({
-            where: { id: roundId },
-            data: { totalScore: { increment: score } },
-          });
-        }
+        // Обновляем общий счет раунда
+        await tx.round.update({
+          where: { id: roundId },
+          data: { totalScore: { increment: score } },
+        });
 
         // Получаем общий счет пользователя в раунде
         const userTaps = await tx.tap.aggregate({
