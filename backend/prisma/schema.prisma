@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  SURVIVOR
+  NIKITA
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  role      UserRole @default(SURVIVOR)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  taps      Tap[]
+  roundsWon Round[] @relation("RoundWinner")
+
+  @@map("users")
+}
+
+model Round {
+  id         String   @id @default(uuid())
+  startDate  DateTime
+  endDate    DateTime
+  createdAt  DateTime @default(now())
+  totalScore Int      @default(0)
+
+  taps     Tap[]
+  winner   User?   @relation("RoundWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+  winnerId String?
+
+  @@index([startDate, endDate])
+  @@map("rounds")
+}
+
+model Tap {
+  id        String   @id @default(uuid())
+  userId    String
+  roundId   String
+  score     Int
+  tapNumber Int
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  round Round @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roundId, tapNumber])
+  @@index([roundId, userId])
+  @@index([roundId, userId, createdAt])
+  @@map("taps")
+}
