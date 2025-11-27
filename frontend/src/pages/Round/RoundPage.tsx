@@ -89,8 +89,12 @@ export default function RoundPage() {
   }
 
   return (
-    <Box sx={{ textAlign: 'center' }}>
-      <Goose />
+    <Box sx={{ textAlign: 'center', position: 'relative' }}>
+      <Goose
+        onClick={handleTap}
+        disabled={roundStatus !== RoundStatus.ACTIVE}
+        isTapping={isTapping}
+      />
 
       {roundStatus === RoundStatus.COOLDOWN && (
         <>
@@ -125,15 +129,11 @@ export default function RoundPage() {
               {tapError}
             </Alert>
           )}
-          <Button
-            variant="contained"
-            size="large"
-            onClick={handleTap}
-            disabled={isTapping}
-            sx={{ minWidth: 200 }}
-          >
-            {isTapping ? 'Тапаю...' : 'Тапнуть'}
-          </Button>
+          {isTapping && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Обработка тапа...
+            </Typography>
+          )}
         </>
       )}
 

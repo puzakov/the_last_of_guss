@@ -6,15 +6,13 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
-  // CORS для разных доменов
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  // CORS - разрешаем запросы с любых хостов
   app.enableCors({
-    origin: frontendUrl,
+    origin: true,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
-  logger.log(`CORS enabled for: ${frontendUrl}`);
 
   // Глобальная валидация через class-validator
   app.useGlobalPipes(
